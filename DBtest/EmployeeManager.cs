@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.Data.SqlClient;
+using Microsoft.VisualBasic;
 
 namespace DBtest
 {
@@ -63,7 +64,7 @@ namespace DBtest
                 if (reader.Read())
                 {
                     Console.WriteLine("Dang nhap thanh cong");
-                    Employee emp = new Employee((string)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (bool)reader[4]);
+                    Employee emp = new Employee((string)reader[1], (string)reader[2], (string)reader[3], (bool)reader[4]);
                     conn.Close();
                     return emp;
                 }
@@ -74,6 +75,7 @@ namespace DBtest
         public override void Find()
         {
             String searchInfo;
+            String sql;
             do
             {
                 Console.Write("Nhap User hoac Id: ");
@@ -82,10 +84,17 @@ namespace DBtest
 
             SqlConnection conn = new DbConnector().GetConnection();
             conn.Open();
-            string sql = "SELECT * FROM dbo.employees WHERE no=@no OR name = @name";
+            if(int.TryParse(searchInfo, out int result))
+            {
+                sql = "SELECT * FROM dbo.employees WHERE no=@no";
+            }
+            else
+            {
+                sql = "SELECT * FROM dbo.employees WHERE name like @name";
+            }
             SqlCommand cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@name", searchInfo);
-            cmd.Parameters.AddWithValue("@no", searchInfo);
+            cmd.Parameters.AddWithValue("@no", result);
+            cmd.Parameters.AddWithValue("@name", "%" + searchInfo  + "%");
             SqlDataReader reader = cmd.ExecuteReader();
             if(reader.HasRows)
             {
@@ -93,7 +102,7 @@ namespace DBtest
                 while (reader.Read())
                 {
                     Employee emp = new Employee();
-                    emp.No = (string)reader[0];
+                    emp.No = (int)reader[0];
                     emp.Name = (string)reader[1];
                     emp.Email = (string)reader[2];
                     emp.Password = (string)reader[3];
@@ -110,10 +119,29 @@ namespace DBtest
         }
         public override void AddNew()
         {
-            Console.Write("Nhap Number: ");
-            String no = Console.ReadLine();
-            Console.Write("Nhap Ten: ");
-            String name = Console.ReadLine();
+            
+            SqlConnection conn = new DbConnector().GetConnection();
+            conn.Open();
+            bool checkName = true;
+            String name="";
+            while (checkName)
+            {
+                Console.Write("Nhap Ten: ");
+                name = Console.ReadLine();
+                string sqlStr = "SELECT * FROM dbo.employees WHERE name = @nameCheck";
+                SqlCommand command = new SqlCommand(sqlStr, conn);
+                command.Parameters.AddWithValue("@nameCheck", name);
+                SqlDataReader reader = command.ExecuteReader();
+                if (reader.HasRows)
+                {
+                    Console.WriteLine("Ten bi trung, de nghi nhap lai");
+                }
+                else
+                {
+                    checkName = false;
+                }
+                reader.Close();
+            }
             Console.Write("Nhap Email: ");
             String email = Console.ReadLine();
             Console.Write("La quan ly y/n:");
@@ -122,13 +150,11 @@ namespace DBtest
             Console.Write("Nhap Password:");
             String password = Console.ReadLine();
             
-            SqlConnection conn = new DbConnector().GetConnection();
-            conn.Open();
 
-            string sql = "INSERT INTO dbo.employees (no, name, email, password, isManager)" +
-                "VALUES (@no, @name, @email, @password, @isManager)";
+
+            string sql = "INSERT INTO dbo.employees (name, email, password, isManager)" +
+                "VALUES (@name, @email, @password, @isManager)";
             SqlCommand cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@no", no);
             cmd.Parameters.AddWithValue("@name", name);
             cmd.Parameters.AddWithValue("@email", email);
             cmd.Parameters.AddWithValue("@password", password);
@@ -137,84 +163,79 @@ namespace DBtest
 
             conn.Close();
         }
-        public override void Update() 
+        public override void Update()
         {
             Find();
             Console.Write("Lua chon ID tai khoan can Update: ");
-            String idUpdate = Console.ReadLine();
-
+            int idUpdate = Convert.ToInt16(Console.ReadLine());
+            String sql;
             Console.WriteLine("Chon truong thong tin ban muon Update");
-            Console.WriteLine("1. Name");
-            Console.WriteLine("2. Email");
-            Console.WriteLine("3. Manager");
-            Console.Write("Select (1-3): ");
+            Console.WriteLine("1. Email");
+            Console.WriteLine("2. Manager");
+            Console.Write("Select (1-2): ");
             int fieldSelect = Convert.ToInt32(Console.ReadLine());
+            SqlConnection conn = new DbConnector().GetConnection();
+            conn.Open();
+           
+
             switch (fieldSelect)
             {
                 case 1:
-                    Console.Write("Nhap Name moi: ");
-                    emps[indexUpdate].Name = Console.ReadLine();
+                    Console.Write("Nhap Email moi: ");
+                    string email = Console.ReadLine();
+                    sql = "UPDATE dbo.employees SET email = @email WHERE no=@no";
+                    SqlCommand command = new SqlCommand(sql, conn);
+                    command.Parameters.AddWithValue("@email", email);
+                    command.Parameters.AddWithValue("@no", idUpdate);
+                    command.ExecuteNonQuery();
                     break;
                 case 2:
-                    Console.Write("Nhap Email moi: ");
-                    emps[indexUpdate].Email = Console.ReadLine();
-                    break;
-                case 3:
                     Console.WriteLine("La quan ly hay khong (y/n): ");
                     Boolean isManager = false;
                     if (Console.ReadLine().ToUpper() == "Y") { isManager = true; }
-                    emps[indexUpdate].IsManager = isManager;
+                    sql = "UPDATE dbo.employees SET isManager = @manager WHERE no = @no";
+                    SqlCommand command1 = new SqlCommand(sql, conn);
+                    command1.Parameters.AddWithValue("@manager", isManager);
+                    command1.Parameters.AddWithValue("@no", idUpdate);
+                    command1.ExecuteNonQuery();
                     break;
             }
-
-            SqlConnection conn = new DbConnector().GetConnection();
-            conn.Open();
-
-            string sql = "INSERT INTO dbo.employees (no, name, email, password, isManager)" +
-                "VALUES (@no, @name, @email, @password, @isManager)";
-            SqlCommand cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@no", no);
-            cmd.Parameters.AddWithValue("@name", name);
-            cmd.Parameters.AddWithValue("@email", email);
-            cmd.Parameters.AddWithValue("@password", password);
-            cmd.Parameters.AddWithValue("@isManager", isManager);
             conn.Close();
-
-            int indexUpdate = -1;
-            foreach (Employee emp in this.emps)
-            {
-                if(emp.No == idUpdate)
-                {
-                    indexUpdate = this.emps.IndexOf(emp);
-                }
-            }     
-            
         }
         public override void Remove()
         {
             Find();
             Console.Write("Lua chon ID tai khoan can xoa: ");
             String idRemove = Console.ReadLine();
-            int indexRemove = -1;
-            foreach (Employee emp in this.emps)
-            {
-                if (emp.No == idRemove)
-                {
-                    indexRemove = this.emps.IndexOf(emp);
-                }
-            }
-            this.emps.RemoveAt(indexRemove);
+            SqlConnection conn = new DbConnector().GetConnection();
+            conn.Open();
+            string sql = "DELETE FROM dbo.employees WHERE no = @no";
+            SqlCommand cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@no", idRemove);
+            cmd.ExecuteNonQuery();
         }
         public override void Export()
         {
-            StreamWriter streamWriter = new StreamWriter("C:\\Users\\TRUNGTV\\T8.csv", false, System.Text.Encoding.UTF8);
+            StreamWriter streamWriter = new StreamWriter("C:\\Users\\ADMIN\\T8.csv", false, System.Text.Encoding.UTF8);
             try
             {
-                foreach (Employee e in emps)
+                SqlConnection conn = new DbConnector().GetConnection();
+                conn.Open();
+                string sql = "SELECT * FROM dbo.employees";
+                SqlCommand cmd = new SqlCommand(sql, conn);
+                SqlDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
                 {
-                    streamWriter.WriteLine(e);
+                    Employee emp = new Employee();
+                    emp.No = (int)reader[0];
+                    emp.Name = (string)reader[1];
+                    emp.Email = (string)reader[2];
+                    emp.Password = (string)reader[3];
+                    emp.IsManager = (bool)reader[4];
+                    streamWriter.WriteLine(emp);
                     streamWriter.Flush();
                 }
+                conn.Close();
             }
             catch (Exception ex)
             {
@@ -227,7 +248,7 @@ namespace DBtest
         }
         public override void Import()
         {
-            String path = "C:\\Users\\TRUNGTV\\T8import.csv";
+            String path = "C:\\Users\\ADMIN\\T8import.csv";
             StreamReader reader = new StreamReader(path) ;
             try
             {
@@ -238,16 +259,25 @@ namespace DBtest
                     string[] strings = line.Split(',');
 
                     //
-                    String no = strings[0];
-                    String name = strings[1];
-                    String email = strings[2];
-                    String password = strings[3];
+                    String name = strings[0];
+                    String email = strings[1];
+                    String password = strings[2];
                     Boolean isManager = false;
-                    if (strings[4].ToUpper() == "TRUE")
+                    if (strings[3].ToUpper() == "TRUE")
                     {
                         isManager = true;
                     }
-                    emps.Add(new Employee(no, name, email, password, isManager));
+                    SqlConnection conn = new DbConnector().GetConnection();
+                    conn.Open();
+                    string sql = "INSERT INTO dbo.employees (name, email, password, isManager)" +
+                "VALUES (@name, @email, @password, @isManager)";
+                    SqlCommand cmd = new SqlCommand(sql, conn);
+                    cmd.Parameters.AddWithValue("@name", name);
+                    cmd.Parameters.AddWithValue("@email", email);
+                    cmd.Parameters.AddWithValue("@password", password);
+                    cmd.Parameters.AddWithValue("@isManager", isManager);
+                    cmd.ExecuteNonQuery();
+                    conn.Close();
                 }
             }
             catch (Exception ex)
@@ -259,6 +289,5 @@ namespace DBtest
                 reader.Close();
             }
         }
-
     }
 }
